@@ -2,22 +2,25 @@
 
 ## Table of Contents
 
-* [Prerequisites](#prerequisites)
-  * [Setup](#setup)
-  * [Intro to Clojure](#intro-to-clojure)
-  * [Conduct During the Workshop](#conduct-during-the-workshop)
-* [Kit Workshop](#kit-workshop-1)
-  * [Creating a Project](#creating-a-project)
-  * [kit.edn](#kitedn)
-  * [Starting the REPL](#starting-the-repl)
-  * [Using Modules](#using-modules)
-  * [CHECKPOINT 1](#checkpoint-1)
-  * [What are Modules](#what-are-modules)
-  * [Adding a Database](#adding-a-database)
-  * [CHECKPOINT 2](#checkpoint-2)
-  * [Managing the Database](#managing-the-database)
-  * [Querying the Database](#querying-the-database)
-  * [CHECKPOINT 3](#checkpoint-3)
+- [Kit Workshop](#kit-workshop)
+  - [Table of Contents](#table-of-contents)
+  - [Prerequisites](#prerequisites)
+    - [Setup](#setup)
+    - [Intro to Clojure](#intro-to-clojure)
+    - [Conduct During the Workshop](#conduct-during-the-workshop)
+  - [Kit Workshop](#kit-workshop-1)
+    - [Creating a Project](#creating-a-project)
+    - [kit.edn](#kitedn)
+    - [Starting the REPL](#starting-the-repl)
+    - [Using Modules](#using-modules)
+    - [CHECKPOINT 1](#checkpoint-1)
+    - [What are Modules](#what-are-modules)
+    - [Adding a Database](#adding-a-database)
+    - [CHECKPOINT 2](#checkpoint-2)
+    - [Managing the Database](#managing-the-database)
+    - [Querying the Database](#querying-the-database)
+    - [CHECKPOINT 3](#checkpoint-3)
+    - [CHECKPOINT 4](#checkpoint-4)
 
 ## Prerequisites
 
@@ -483,3 +486,77 @@ At this point you should have a `gifs` table in your database, queries written f
 
 [Click here to continue on to Checkpoint 4](https://github.com/nikolap/kit-workshop/tree/checkpoint-4)
 
+### CHECKPOINT 4
+
+Now that we have a database and queries to store and read the gif data, let's add a couple routes to provide an HTTP API on top of that.
+
+We'll create a new namespace called `io.github.kit.gif2html.web.controllers.gifs` that will contain the handlers for these operations.
+Each handler will accept the Integrant options along with the HTTP request map as its input and produce an HTTP response as its output.
+
+First, let's require `ring.util.http-response` in the namespace declaration so that we can use the response helpers:
+
+```clojure
+(ns io.github.kit.gif2html.web.controllers.gifs
+  (:require
+   [ring.util.http-response :as http-response]))
+```
+
+Next, let's write a handler to save the gif to the database. The handler will grab the `query-fn` from the Integrant options map, and the body parametes from the request. Then it will call `create-gif!` function and pass it the parameters in order to create a record in our db, and return `{:result :ok}` as the response.
+
+```clojure
+(defn save-gif [{:keys [query-fn] :as opts} {{params :body} :parameters}]
+  (query-fn :create-gif! params)
+  (http-response/ok {:result :ok}))
+```
+
+Let's take a closer look at what's happening here. The `query-fn` is available because we specified it as a referenced by `:reitit.routes/api` in the `resources/system.edn`:
+
+```clojure
+ :reitit.routes/api
+ {:base-path "/api"
+  :env #ig/ref :system/env
+  :query-fn #ig/ref :db.sql/query-fn}
+```
+
+The map associated with the `:reitit.routes/api` is then accessed by the component declared in `io.github.kit.gif2html.web.routes.api`:
+
+```clojure
+(defmethod ig/init-key :reitit.routes/api
+  [_ {:keys [base-path]
+      :or   {base-path ""}
+      :as   opts}]
+  [base-path route-data (api-routes opts)])
+  ```
+
+The `opts` map contains components that were initialized when the configuration was loaded. The `opts` are then apssed to the `api-routes` making them available to the handlers:
+
+```clojure
+(defn api-routes [opts]
+  [["/swagger.json"
+    {:get {:no-doc  true
+           :swagger {:info {:title "io.github.kit.gif2html API"}}
+           :handler (swagger/create-swagger-handler)}}]
+   ["/health"
+    {:get health/healthcheck!}]])
+```
+
+Let's add a new route that will call the `save-gif` handler:
+
+```clojure
+(defn api-routes [opts]
+  [["/swagger.json"
+    {:get {:no-doc  true
+           :swagger {:info {:title "io.github.kit.gif2html API"}}
+           :handler (swagger/create-swagger-handler)}}]
+   ["/health"
+    {:get health/healthcheck!}]
+   ["/save-gif"
+    {:post {:summary "minus with clojure.spec body parameters"
+     :parameters {:body [:map
+                    [:html string?]
+                    [:name string?]]}
+     :responses {200 {:body [:map [:result keyword?]]}}
+     :handler (partial gifs/save-gif opts)}}]])
+```
+
+Let's run `(integrant.repl/reset)` to reload the system and navigate to `http://localhost:3000/api` in order to test out our new route.
