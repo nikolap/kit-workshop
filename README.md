@@ -666,6 +666,8 @@ Let's try these libraries out! We have this sample GIF we can play with https://
 (convert/gif->html
   (:body (hc/get "https://media.tenor.com/JMzBeLgNaSoAAAAj/banana-dance.gif" {:as :stream})))
 ```
+TODO: https://raw.githubusercontent.com/nikolap/kit-workshop/checkpoint-5/banana-dance.gif
+
 
 TODO: hato to integrant component
 
