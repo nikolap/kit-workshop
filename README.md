@@ -20,6 +20,7 @@
     - [Managing the Database](#managing-the-database)
     - [Querying the Database](#querying-the-database)
     - [CHECKPOINT 3](#checkpoint-3)
+    - [Routing](#routing)
     - [CHECKPOINT 4](#checkpoint-4)
 
 ## Prerequisites
@@ -486,7 +487,7 @@ At this point you should have a `gifs` table in your database, queries written f
 
 [Click here to continue on to Checkpoint 4](https://github.com/nikolap/kit-workshop/tree/checkpoint-4)
 
-### CHECKPOINT 4
+### Routing
 
 Now that we have a database and queries to store and read the gif data, let's add a couple routes to provide an HTTP API on top of that.
 
@@ -626,3 +627,9 @@ Let's put all of this together, refactoring our existing implementation to follo
                    :responses  {200 {:body gifs/Gif}}
                    :handler    (partial gifs/get-gif-by-id opts)}}]]
 ```
+
+### CHECKPOINT 4
+
+At this point you should have a `gifs` table in your database, queries written for it, and able to read and write from the REPL.
+
+[Click here to continue on to Checkpoint 5](https://github.com/nikolap/kit-workshop/tree/checkpoint-5)
