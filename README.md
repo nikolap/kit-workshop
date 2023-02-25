@@ -633,3 +633,38 @@ Let's put all of this together, refactoring our existing implementation to follo
 At this point you should have a `gifs` table in your database, queries written for it, and able to read and write from the REPL.
 
 [Click here to continue on to Checkpoint 5](https://github.com/nikolap/kit-workshop/tree/checkpoint-5)
+
+### Adding Dependencies
+
+At this point we have set up all our scaffolding but we still need to convert gifs to text. To do this we'll use the [gif-to-html](https://github.com/yogthos/gif-to-html) library.
+
+Let's go to that library repository and see how they recommend adding it to your project.
+
+We can see this project can be added by pasting the following into your deps.edn
+
+```clojure
+io.github.yogthos/gif-to-html {:git/tag "v1.0.0" :sha "07fa5d3"}
+```
+
+You'll notice this looks quite different than most of our other dependencies in deps.edn. This is because there are three different types of dependencies we can reference in our deps.edn (two of which we use here):
+
+- Maven repositories (the most common, `{:mvn/version "1.2.3"}`)
+- Git repositories (various ways, such as `{:git/tag "v0.0.1" :git/sha "4c4a34d"}`)
+- Local repositories (a reference to a path, `{:local/root "../my-lib"}`)
+
+For more information you can refer to the [deps and CLI guide](https://clojure.org/guides/deps_and_cli).
+
+Once you add this dependency to your deps.edn you might notice your REPL automatically trying to load in the changes. This doesn't work 100% of the time, so if you do notice any strange issues, please restart your REPL.
+
+One more library we'll need is [hato](https://github.com/gnarroway/hato), a lightweight wrapper around the Java 11 HTTP client.
+
+Let's try these libraries out! We have this sample GIF we can play with https://media.tenor.com/JMzBeLgNaSoAAAAj/banana-dance.gif. In our REPL:
+
+```clojure
+(require '[gif-to-html.convert :as convert])
+(require '[hato.client :as hc])
+(convert/gif->html
+  (:body (hc/get "https://media.tenor.com/JMzBeLgNaSoAAAAj/banana-dance.gif" {:as :stream})))
+```
+
+TODO: hato to integrant component
