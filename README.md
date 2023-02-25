@@ -658,7 +658,7 @@ Once you add this dependency to your deps.edn you might notice your REPL automat
 
 One more library we'll need is [hato](https://github.com/gnarroway/hato), a lightweight wrapper around the Java 11 HTTP client.
 
-Let's try these libraries out! We have this sample GIF we can play with https://media.tenor.com/JMzBeLgNaSoAAAAj/banana-dance.gif. In our REPL:
+Let's try these libraries out! We have this sample GIF we can play with `https://media.tenor.com/JMzBeLgNaSoAAAAj/banana-dance.gif`. In our REPL:
 
 ```clojure
 (require '[gif-to-html.convert :as convert])
@@ -666,7 +666,8 @@ Let's try these libraries out! We have this sample GIF we can play with https://
 (convert/gif->html
   (:body (hc/get "https://media.tenor.com/JMzBeLgNaSoAAAAj/banana-dance.gif" {:as :stream})))
 ```
-TODO: https://raw.githubusercontent.com/nikolap/kit-workshop/checkpoint-5/banana-dance.gif
+
+Note: if this URL doesn't work / returns a 404, you could try the image we hosted in this Git repo, i.e. `https://raw.githubusercontent.com/nikolap/kit-workshop/checkpoint-5/banana-dance.gif`
 
 
 TODO: hato to integrant component
