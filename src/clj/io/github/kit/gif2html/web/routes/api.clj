@@ -19,13 +19,20 @@
            :handler (swagger/create-swagger-handler)}}]
    ["/health"
     {:get health/healthcheck!}]
-   ["/save-gif"
-    {:post {:summary "minus with clojure.spec body parameters"
-:parameters {:body [:map
-                    [:html string?]
-                    [:name string?]]}
-:responses {200 {:body [:map [:result keyword?]]}}
-            :handler (partial gifs/save-gif opts)}}]])
+   ["/gifs"
+    ["" {:post {:summary    "creates a new gif and returns success keyword"
+                :parameters {:body [:map
+                                    [:html string?]
+                                    [:name string?]]}
+                :responses  {200 {:body [:map [:result keyword?]]}}
+                :handler    (partial gifs/save-gif opts)}
+         :get  {:summary   "returns all created gifs"
+                :responses {200 {:body [:vector gifs/Gif]}}
+                :handler   (partial gifs/list-gifs opts)}}]
+    ["/:id" {:get {:summary    "gets a single gif based off of ID"
+                   :parameters {:path [:map [:id integer?]]}
+                   :responses  {200 {:body gifs/Gif}}
+                   :handler    (partial gifs/get-gif-by-id opts)}}]]])
 
 (def route-data
   {:coercion   malli/coercion

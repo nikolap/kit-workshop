@@ -528,7 +528,7 @@ The map associated with the `:reitit.routes/api` is then accessed by the compone
   [base-path route-data (api-routes opts)])
   ```
 
-The `opts` map contains components that were initialized when the configuration was loaded. The `opts` are then apssed to the `api-routes` making them available to the handlers:
+The `opts` map contains components that were initialized when the configuration was loaded. The `opts` are then added to the `api-routes` making them available to the handlers:
 
 ```clojure
 (defn api-routes [opts]
@@ -550,13 +550,79 @@ Let's add a new route that will call the `save-gif` handler:
            :handler (swagger/create-swagger-handler)}}]
    ["/health"
     {:get health/healthcheck!}]
-   ["/save-gif"
-    {:post {:summary "minus with clojure.spec body parameters"
-     :parameters {:body [:map
-                    [:html string?]
-                    [:name string?]]}
-     :responses {200 {:body [:map [:result keyword?]]}}
-     :handler (partial gifs/save-gif opts)}}]])
+   ["/gifs"
+    {:post {:summary    "creates a new gif and returns success keyword"
+            :parameters {:body [:map
+                                [:html string?]
+                                [:name string?]]}
+            :responses  {200 {:body [:map [:result keyword?]]}}
+            :handler    (partial gifs/save-gif opts)}}]])
 ```
 
 Let's run `(integrant.repl/reset)` to reload the system and navigate to `http://localhost:3000/api` in order to test out our new route.
+
+We'll add another route to list all the gifs, and then one to fetch by gif ID. First let's create our controller logic
+
+```clojure
+(defn list-gifs [{:keys [query-fn] :as opts} _]
+  (http-response/ok (query-fn :list-gifs {})))
+
+(defn get-gif-by-id [{:keys [query-fn] :as opts} {{params :path} :parameters}]
+  (http-response/ok (query-fn :get-gif-by-id params)))
+```
+
+We'll also add a quick Malli definition of our data returned as a Gif in this namespace
+
+```clojure
+(def Gif
+  [:map
+   [:id integer?]
+   [:html string?]
+   [:name string?]])
+```
+
+Now to hook this logic into our routes, we can add a `:get` key to our original map on the `/api/gifs` endpoint like so
+
+```clojure
+["/gifs"
+ {:post {:summary    "creates a new gif and returns success keyword"
+         :parameters {:body [:map
+                             [:html string?]
+                             [:name string?]]}
+         :responses  {200 {:body [:map [:result keyword?]]}}
+         :handler    (partial gifs/save-gif opts)}
+  :get  {:summary   "returns all created gifs"
+         :responses {200 {:body [:vector gifs/Gif]}}
+         :handler   (partial gifs/list-gifs opts)}}]
+```
+
+Reitit routes are data structures, as you may have noticed in this process. We can nest routes under path segments by creating a vector. For example:
+
+```clojure
+["/gifs"
+  ["" ...]
+  ["/:id" ...]]
+```
+
+Here we have two valid routes, "/gifs" and "/gifs/:id". `:id` is a variable path parameter, meaning that any value placed there will be interpreted as the `:id` parameter in our routes. So "/gifs/23" would have `{:id 23}` in our path parameters. Important to note, doing this means we cannot have another route on the same level that can potentially conflict with path parameters. For more on this, you can check out the [reitit documentation](https://cljdoc.org/d/metosin/reitit/0.6.0/doc/basics/route-syntax).
+
+When you nest routes under path segments, your request handlers cannot be in the top level, i.e. this is why we need the empty `""` route for handling our requests to "/api/gifs".
+
+Let's put all of this together, refactoring our existing implementation to follow this pattern.
+
+```clojure
+["/gifs"
+    ["" {:post {:summary    "creates a new gif and returns success keyword"
+                :parameters {:body [:map
+                                    [:html string?]
+                                    [:name string?]]}
+                :responses  {200 {:body [:map [:result keyword?]]}}
+                :handler    (partial gifs/save-gif opts)}
+         :get  {:summary   "returns all created gifs"
+                :responses {200 {:body [:vector gifs/Gif]}}
+                :handler   (partial gifs/list-gifs opts)}}]
+    ["/:id" {:get {:summary    "gets a single gif based off of ID"
+                   :parameters {:path [:map [:id integer?]]}
+                   :responses  {200 {:body gifs/Gif}}
+                   :handler    (partial gifs/get-gif-by-id opts)}}]]
+```
