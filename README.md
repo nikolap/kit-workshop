@@ -22,6 +22,8 @@
     - [CHECKPOINT 3](#checkpoint-3)
     - [Routing](#routing)
     - [CHECKPOINT 4](#checkpoint-4)
+    - [Adding Dependencies](#adding-dependencies)
+    - [Creating Integrant Components](#creating-integrant-components)
 
 ## Prerequisites
 
@@ -669,8 +671,81 @@ Let's try these libraries out! We have this sample GIF we can play with `https:/
 
 Note: if this URL doesn't work / returns a 404, you could try the image we hosted in this Git repo, i.e. `https://raw.githubusercontent.com/nikolap/kit-workshop/checkpoint-5/banana-dance.gif`
 
+### Creating Integrant Components
 
-TODO: hato to integrant component
+Hato uses the JDK11 HTTP client in each HTTP request it sends. The best practice for this is to define a client ahead of time and use that client for all relevant requests. While Kit offers the [kit-hato](https://clojars.org/io.github.kit-clj/kit-hato) library, for sake of practice we will build ours from scratch here and hook it up to our routes.
+
+Let's create a new namespace, `hato`. We'll refer to the documentation in [hato](https://github.com/gnarroway/hato) to find the API to create a client. We'll reference `hato.client` as `hc`. Let's quickly test this in the REPL that we can create a new client.
+
+```clojure
+(def c (hc/build-http-client {}))
+
+(hc/get "https://www.google.com/" {:http-client c})
+```
+
+Great! Now let's make an [Integrant](https://github.com/weavejester/integrant) component from this. We've worked with defining configurations for Integrant before, so now let's create the logic that takes those configurations and creates stateful components from them.
+
+Our system has stateful components that have a lifecycle. This means that when they start up code is executed and an instance of a component is returned. Similarly, on stop or shutdown, code will execute to gracefully bring the instance down. 
+
+There are various Integrant lifecycle multimethod functions. They include:
+
+- `prep-key`: transforms config data (i.e. from your `system.edn`)
+- `init-key`: starts and returns a component instance
+- `halt-key!`: side-effectful, stops the running component instance. Used when shutting down, i.e. would never resume from here.
+- `resume-key`: resumes a component instances. Typically in REPL development
+- `suspend-key!`: side-effectful, stops the running components. Typically in REPL development, since can resume from here
+
+The difference between halt and suspend is that with suspend you can preserve some component instance state while stopped, whereas with halt the goal is to prepare the component for shutdown.
+
+For more information on each of these, you can refer to the [Integrant documentation](https://github.com/weavejester/integrant).
+
+With all that information let's try to create our first Integrant component which returns a Hato HTTP client given a config map.
+
+```clojure
+(defmethod ig/init-key :http/hato [_ opts]
+  (hc/build-http-client opts))
+```
+
+While we don't need to halt the client, for illustration purposes here is how you might stop it:
+
+```clojure
+(defmethod ig/halt-key! :http/hato [_ _http-client]
+  ;; If there was effectful logic here to stop it you would do it here
+  nil)
+```
+
+Let's put this together in our hato namespace:
+
+```clojure
+(ns io.github.kit.gif2html.hato
+  (:require
+    [integrant.core :as ig]
+    [hato.client :as hc]))
+
+(defmethod ig/init-key :http/hato [_ opts]
+  (hc/build-http-client opts))
+```
+
+and require the namespace over in `core`
+
+    [io.github.kit.gif2html.hato]
+
+Let's first try it out in our REPL by calling the multimethod `ig/init-key` and ensuring the value we get back is our HTTP client:
+
+```clojure
+(ig/init-key :http/hato {})
+=> #object[jdk.internal.net.http.HttpClientFacade 0x25b614f6 "jdk.internal.net.http.HttpClientImpl@868586f(4)"]
+```
+
+Now let's add this to our `system.edn`. For sake of using the Hato client configuration, let's set a maximum connection timeout to 3 seconds, i.e. `:connect-timeout 3000`
+
+```clojure
+:http/hato
+ {:connect-timeout 3000}
+```
+
+Now if we run `(reset)` we should be able to verify that `(:http/hato state/system)` exists.
+
 
 TODO: hook it into the existing create
 

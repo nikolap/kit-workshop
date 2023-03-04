@@ -8,6 +8,7 @@
     ;; Edges       
     [kit.edge.server.undertow]
     [io.github.kit.gif2html.web.handler]
+    [io.github.kit.gif2html.hato]
 
     ;; Routes
     [io.github.kit.gif2html.web.routes.api]

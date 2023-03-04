@@ -51,4 +51,8 @@
                      :db {:datasource #ig/ref :db.sql/connection},
                      :migrate-on-init? true}
  :db.sql/connection #profile {:default {:jdbc-url "jdbc:postgresql://localhost:5432/gif2html?user=gif2html&password=gif2html"} 
-                              :prod {:jdbc-url #env JDBC_URL}}}
+                              :prod {:jdbc-url #env JDBC_URL}}
+
+ :http/hato
+ {:connect-timeout 3000}
+ }
