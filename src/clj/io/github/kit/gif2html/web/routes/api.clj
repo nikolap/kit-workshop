@@ -22,7 +22,7 @@
    ["/gifs"
     ["" {:post {:summary    "creates a new gif and returns success keyword"
                 :parameters {:body [:map
-                                    [:html string?]
+                                    [:link string?]
                                     [:name string?]]}
                 :responses  {200 {:body [:map [:result keyword?]]}}
                 :handler    (partial gifs/save-gif opts)}
