@@ -5,7 +5,7 @@
 (def Gif
   [:map
    [:id integer?]
-   [:html string?]
+   [:link string?]
    [:name string?]])
 
 (defn save-gif [{:keys [query-fn] :as opts} {{params :body} :parameters}]
