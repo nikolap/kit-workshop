@@ -384,10 +384,10 @@ Here's the one we came up with
 ```sql
 create table if not exists gifs
 (
-    id         serial primary key,
-    html       text                      not null,
-    name       text                      not null,
-    created_at timestamptz default now() not null
+  id         serial primary key,
+  html       text                      not null,
+  name       text                      not null,
+  created_at timestamptz default now() not null
 );
 ```
 
@@ -405,8 +405,8 @@ Now if we try that command from before to get our columns from the new `gifs` ta
 
 ```clojure
 clj꞉user꞉>(jdbc/execute!
-  (:db.sql/connection state/system)
-  ["select column_name from information_schema.columns where table_name = 'gifs';"])
+            (:db.sql/connection state/system)
+            ["select column_name from information_schema.columns where table_name = 'gifs';"])
 [#:columns{:column_name "id"}
  #:columns{:column_name "created_at"}
  #:columns{:column_name "html"}
@@ -434,8 +434,8 @@ For starters we'll create some simple queries to write and read from our databas
 ```sql
 -- :name create-gif! :<!
 -- :doc inserts and returns a gif
-insert into gifs(html, name)
-values (:html, :name)
+insert into gifs(link, name)
+values (:link, :name)
 returning *;
 
 -- :name get-gif-by-id :? :1
@@ -452,26 +452,26 @@ from gifs;
 
 Let's `(reset)` again and try out our queries in the REPL.
 
-First, let's create an entry. We can create a gif by querying `:create-gif!` and giving it a map with two keys, `:html` and `:name`. 
+First, let's create an entry. We can create a gif by querying `:create-gif!` and giving it a map with two keys, `:link` and `:name`.
 
 ```clojure
 clj꞉user꞉>((:db.sql/query-fn state/system)
-  :create-gif! {:html "test html" :name "test name"})
-[{:id 1, :html "test html", :name "test name", :created_at #inst"2023-02-18T16:25:05.857508000-00:00"}]
+  :create-gif! {:link "test html" :name "test name"})
+[{:id 1, :link "test html", :name "test name", :created_at #inst"2023-02-18T16:25:05.857508000-00:00"}]
 ```
 
 We can get that gif by querying for its ID in a similar fashion.
 
 ```clojure
 clj꞉user꞉>((:db.sql/query-fn state/system) :get-gif-by-id {:id 1})
-{:id 1, :html "test html", :name "test name", :created_at #inst"2023-02-18T16:25:05.857508000-00:00"}
+{:id 1, :link "test html", :name "test name", :created_at #inst"2023-02-18T16:25:05.857508000-00:00"}
 ```
 
 And to list all of them we can query with an empty parameter map. Note this argument is required, so even if your query doesn't have any arguments you will need to provide `{}`.
 
 ```clojure
 clj꞉user꞉>((:db.sql/query-fn state/system) :list-gifs {})
-[{:id 1, :html "test html", :name "test name", :created_at #inst"2023-02-18T16:25:05.857508000-00:00"}]
+[{:id 1, :link "test html", :name "test name", :created_at #inst"2023-02-18T16:25:05.857508000-00:00"}]
 ```
 
 We've been using the `(:db.sql/query-fn state/system)` function quite often for testing. Why not add it to our `user.clj` namespace. Since this component is only available when the system is started, we can either define it in a function, or have it in our rich comment block at the end. We'll do the latter in this example.
@@ -556,7 +556,7 @@ Let's add a new route that will call the `save-gif` handler:
    ["/gifs"
     {:post {:summary    "creates a new gif and returns success keyword"
             :parameters {:body [:map
-                                [:html string?]
+                                [:link string?]
                                 [:name string?]]}
             :responses  {200 {:body [:map [:result keyword?]]}}
             :handler    (partial gifs/save-gif opts)}}]])
@@ -580,7 +580,7 @@ We'll also add a quick Malli definition of our data returned as a Gif in this na
 (def Gif
   [:map
    [:id integer?]
-   [:html string?]
+   [:link string?]
    [:name string?]])
 ```
 
@@ -590,7 +590,7 @@ Now to hook this logic into our routes, we can add a `:get` key to our original 
 ["/gifs"
  {:post {:summary    "creates a new gif and returns success keyword"
          :parameters {:body [:map
-                             [:html string?]
+                             [:link string?]
                              [:name string?]]}
          :responses  {200 {:body [:map [:result keyword?]]}}
          :handler    (partial gifs/save-gif opts)}
@@ -615,19 +615,19 @@ Let's put all of this together, refactoring our existing implementation to follo
 
 ```clojure
 ["/gifs"
-    ["" {:post {:summary    "creates a new gif and returns success keyword"
-                :parameters {:body [:map
-                                    [:html string?]
-                                    [:name string?]]}
-                :responses  {200 {:body [:map [:result keyword?]]}}
-                :handler    (partial gifs/save-gif opts)}
-         :get  {:summary   "returns all created gifs"
-                :responses {200 {:body [:vector gifs/Gif]}}
-                :handler   (partial gifs/list-gifs opts)}}]
-    ["/:id" {:get {:summary    "gets a single gif based off of ID"
-                   :parameters {:path [:map [:id integer?]]}
-                   :responses  {200 {:body gifs/Gif}}
-                   :handler    (partial gifs/get-gif-by-id opts)}}]]
+ ["" {:post {:summary    "creates a new gif and returns success keyword"
+             :parameters {:body [:map
+                                 [:link string?]
+                                 [:name string?]]}
+             :responses  {200 {:body [:map [:result keyword?]]}}
+             :handler    (partial gifs/save-gif opts)}
+      :get  {:summary   "returns all created gifs"
+             :responses {200 {:body [:vector gifs/Gif]}}
+             :handler   (partial gifs/list-gifs opts)}}]
+ ["/:id" {:get {:summary    "gets a single gif based off of ID"
+                :parameters {:path [:map [:id integer?]]}
+                :responses  {200 {:body gifs/Gif}}
+                :handler    (partial gifs/get-gif-by-id opts)}}]]
 ```
 
 ### CHECKPOINT 4
