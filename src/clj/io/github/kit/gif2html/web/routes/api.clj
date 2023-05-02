@@ -24,7 +24,7 @@
                 :parameters {:body [:map
                                     [:link string?]
                                     [:name string?]]}
-                :responses  {200 {:body [:map [:result keyword?]]}}
+                :responses  {200 {:body [:map [:id integer?]]}}
                 :handler    (partial gifs/save-gif opts)}
          :get  {:summary   "returns all created gifs"
                 :responses {200 {:body [:vector gifs/Gif]}}

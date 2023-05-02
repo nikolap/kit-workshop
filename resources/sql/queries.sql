@@ -2,9 +2,9 @@
 
 -- :name create-gif! :<!
 -- :doc inserts and returns a gif
-insert into gifs(html, name)
-values (:html, :name)
-returning *;
+insert into gifs(ascii, name)
+values (:ascii, :name)
+returning id;
 
 -- :name get-gif-by-id :? :1
 -- :doc gets a single gif given its ID

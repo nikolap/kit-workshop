@@ -7,6 +7,7 @@
 
     ;; Edges       
     [kit.edge.server.undertow]
+    [kit.edge.db.postgres]
     [io.github.kit.gif2html.web.handler]
     [io.github.kit.gif2html.hato]
 

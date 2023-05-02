@@ -35,23 +35,24 @@
                                      :default-charset "utf-8"}}}
 
  :reitit.routes/api
- {:base-path "/api"
-  :env #ig/ref :system/env
-  :query-fn #ig/ref :db.sql/query-fn}
+ {:base-path   "/api"
+  :env         #ig/ref :system/env
+  :query-fn    #ig/ref :db.sql/query-fn
+  :http-client #ig/ref :http/hato}
 
  :router/routes
  {:routes #ig/refset :reitit/routes}
 
  :router/core
  {:routes #ig/ref :router/routes}
- :db.sql/query-fn {:conn #ig/ref :db.sql/connection,
-                   :options {},
-                   :filename "sql/queries.sql"}
- :db.sql/migrations {:store :database,
-                     :db {:datasource #ig/ref :db.sql/connection},
+ :db.sql/query-fn   {:conn     #ig/ref :db.sql/connection,
+                     :options  {},
+                     :filename "sql/queries.sql"}
+ :db.sql/migrations {:store            :database,
+                     :db               {:datasource #ig/ref :db.sql/connection},
                      :migrate-on-init? true}
- :db.sql/connection #profile {:default {:jdbc-url "jdbc:postgresql://localhost:5432/gif2html?user=gif2html&password=gif2html"} 
-                              :prod {:jdbc-url #env JDBC_URL}}
+ :db.sql/connection #profile {:default {:jdbc-url "jdbc:postgresql://localhost:5432/gif2html?user=gif2html&password=gif2html"}
+                              :prod    {:jdbc-url #env JDBC_URL}}
 
  :http/hato
  {:connect-timeout 3000}
