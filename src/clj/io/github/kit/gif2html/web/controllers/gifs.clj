@@ -7,8 +7,9 @@
 (def Gif
   [:map
    [:id integer?]
-   [:link string?]
-   [:name string?]])
+   [:ascii map?]
+   [:name string?]
+   [:created_at inst?]])
 
 (defn save-gif [{:keys [query-fn http-client] :as opts} {{params :body} :parameters}]
   (try

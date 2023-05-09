@@ -24,6 +24,15 @@
     - [CHECKPOINT 4](#checkpoint-4)
     - [Adding Dependencies](#adding-dependencies)
     - [Creating Integrant Components](#creating-integrant-components)
+      - [Integrant Component Lifecycle](#integrant-component-lifecycle)
+      - [Compoent Lifecycle Multimethods](#compoent-lifecycle-multimethods)
+      - [Loading Integrant Components](#loading-integrant-components)
+      - [Trying Things Out in the REPL](#trying-things-out-in-the-repl)
+      - [Wiring Up Our New Component](#wiring-up-our-new-component)
+    - [Processing GIF Payload](#processing-gif-payload)
+      - [Error Handling](#error-handling)
+      - [Swagger API Testing](#swagger-api-testing)
+    - [CHECKPOINT 5](#checkpoint-5)
 
 ## Prerequisites
 
@@ -685,6 +694,8 @@ Let's create a new namespace, `hato`. We'll refer to the documentation in [hato]
 (hc/get "https://www.google.com/" {:http-client c})
 ```
 
+#### Integrant Component Lifecycle
+
 Great! Now let's make an [Integrant](https://github.com/weavejester/integrant) component from this. We've worked with defining configurations for Integrant before, so now let's create the logic that takes those configurations and creates stateful components from them.
 
 Our system has stateful components that have a lifecycle. This means that when they start up code is executed and an instance of a component is returned. Similarly, on stop or shutdown, code will execute to gracefully bring the instance down. 
@@ -700,6 +711,8 @@ There are various Integrant lifecycle multimethod functions. They include:
 The difference between halt and suspend is that with suspend you can preserve some component instance state while stopped, whereas with halt the goal is to prepare the component for shutdown.
 
 For more information on each of these, you can refer to the [Integrant documentation](https://github.com/weavejester/integrant).
+
+#### Compoent Lifecycle Multimethods
 
 With all that information let's try to create our first Integrant component which returns a Hato HTTP client given a config map.
 
@@ -728,9 +741,15 @@ Let's put this together in our hato namespace:
   (hc/build-http-client opts))
 ```
 
-and require the namespace over in `core`
+#### Loading Integrant Components
 
-    [io.github.kit.gif2html.hato]
+In order for Integrant to load the namespace we have to ensure that it is required in the `core` namespace that constitutes the entry point for the application:
+
+```clojure
+[io.github.kit.gif2html.hato]
+```
+
+#### Trying Things Out in the REPL
 
 Let's first try it out in our REPL by calling the multimethod `ig/init-key` and ensuring the value we get back is our HTTP client:
 
@@ -738,6 +757,8 @@ Let's first try it out in our REPL by calling the multimethod `ig/init-key` and 
 (ig/init-key :http/hato {})
 => #object[jdk.internal.net.http.HttpClientFacade 0x25b614f6 "jdk.internal.net.http.HttpClientImpl@868586f(4)"]
 ```
+
+#### Wiring Up Our New Component
 
 Now let's add this to our `system.edn`. For sake of using the Hato client configuration, let's set a maximum connection timeout to 3 seconds, i.e. `:connect-timeout 3000`
 
@@ -759,6 +780,8 @@ Let's add this component to our API routes now as `http-client`. It should look 
 ```
 
 Great! So now we have an HTTP client we can use to fetch the GIF and convert it to data.
+
+### Processing GIF Payload
 
 Before you'll recall we were able to fetch a URL and convert the body stream to an EDN map. Let's do that again, but this time include the link from the parameters, and follow it up by saving the data to the database.
 
@@ -794,6 +817,8 @@ We see that this returns a vector with a map containing the `id` key. We can des
        (first)
        (http-response/ok)))
 ```
+
+#### Error Handling
 
 However, you might ask the question "what happens if someone sends a broken link?" Let's try it in the REPL first:
 
@@ -834,6 +859,8 @@ Uh oh, we'll need to handle this case. Let's do that by wrapping the code in a `
     (catch Exception _e
       (http-response/internal-server-error))))
 ```
+
+#### Swagger API Testing
 
 Let's try this in our Swagger UI. We'll notice an error occurs. There's some response data, let's take a look and fix our endpoint:
 
@@ -877,6 +904,64 @@ That's right, we changed the shape of our response from being a map of `result` 
 {200 {:body [:map [:id integer?]]}}
 ```
 
+Now we can navigate back to our Swagger UI at `http://localhost:3000/api/` and try out the API. Let's first submit a new GIF to be processed by calling the `POST` request with the following payload:
+
+```javascript
+{
+  "link": "https://media.tenor.com/JMzBeLgNaSoAAAAj/banana-dance.gif",
+  "name": "banana"
+}
+```
+
+We should see a response containing the id of the item that was inserted if the GIF was processed successfully:
+
+```javascript
+{
+  "id": 1
+}
+```
+
+Next, let's test we are able to retreive the animation by calling the `GET` API:
+
+```javascript
+{
+  "schema": "[:map {:closed true} [:id integer?] [:link string?] [:name string?]]",
+  "errors": [
+    {
+      "path": [
+        "link"
+      ],
+      "in": [
+        "link"
+      ],
+      "schema": "[:map {:closed true} [:id integer?] [:link string?] [:name string?]]",
+      "value": null,
+      "type": "malli.core/missing-key",
+      "message": "missing required key"
+    }
+    ...}
+```
+
+Unfortunately, we see a 500 response because the response does not match the schema we defined earlier. Let's navigate to the `io.github.kit.gif2html.web.controllers.gifs` namespace for managing saving and retrieving animations where we'll update the `Gif` schema to look as follows:
+
+```clojure
+(def Gif
+  [:map
+   [:id integer?]
+   [:ascii map?]
+   [:name string?]
+   [:created_at inst?]])
+```
+
+We'll need to run `(integrant.repl/reset)` in the REPL to reload the system, and then we can try testing our endpoint again. This time we should get a 200 response containing the ASCII animation.
+
 ### CHECKPOINT 5
 
+At this point you should be comfortable with the following concepts:
 
+* adding dependencies to the project
+* creating new Integrant components by hand
+* updating `system.edn` to wire up new components
+* using Hato HTTP client to fetch binary data
+* error handling with try/catch
+* using Swagger UI to test the endpoints and debugging Malli schema errors
