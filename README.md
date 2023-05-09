@@ -591,7 +591,7 @@ We'll also add a quick Malli definition of our data returned as a Gif in this na
 (def Gif
   [:map
    [:id integer?]
-   [:link string?]
+   [:ascii map?]
    [:name string?]])
 ```
 
