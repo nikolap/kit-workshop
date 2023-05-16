@@ -33,6 +33,7 @@
       - [Error Handling](#error-handling)
       - [Swagger API Testing](#swagger-api-testing)
     - [CHECKPOINT 5](#checkpoint-5)
+    - [Testing with the REPL](#testing-with-the-repl)
 
 ## Prerequisites
 
@@ -965,3 +966,122 @@ At this point you should be comfortable with the following concepts:
 * using Hato HTTP client to fetch binary data
 * error handling with try/catch
 * using Swagger UI to test the endpoints and debugging Malli schema errors
+
+
+### Testing with the REPL
+
+Now that we've finalized the API, let's try it out using the REPL. Once we've convinced ourselves that everything works the way we expect then we can convert our REPL session into actual tests. First thing we should do is make sure we have a clear REPL state, to do that let's run `(integrant.repl/reset)`. Next, let's try running the functions that service the API with some sample data.
+
+Let's switch the editor to the `io.github.kit.gif2html.web.controllers.gifs` namespace. We will need access to the system in order to run these function. The state of the system can be accessed via `integrant.repl.state/system` any time via the REPL. Since it's a big map, it's often handy to just look at the keys:
+
+```clojure
+(keys integrant.repl.state/system)
+=> (:router/core :db.sql/query-fn :http/hato :reitit.routes/api :handler/ring :server/http :db.sql/connection :router/routes :db.sql/migrations :system/env)
+```
+
+For our purposes we'll want to grab the `:db.sql/query-fn` and `:http/hato` keys. We can then use these to access the resources that need to be passed in to the functions we want to test. We can now try to save a GIF using the REPL as follows:
+
+```clojure
+(comment
+  (let [{:keys [:db.sql/query-fn :http/hato] }integrant.repl.state/system]
+    (save-gif {:query-fn query-fn :http-client hato}
+              {:parameters {:body {:link "https://media.tenor.com/JMzBeLgNaSoAAAAj/banana-dance.gif" :name "foo"}}}))
+)
+```
+
+Since we access resources such as the db often, it can be useful to add helper function in the `user` namespace for accessing these resources via the REPL. For example, let's add the following helper:
+
+```clojure
+(defn api-ctx []
+  {:query-fn (:db.sql/query-fn state/system)
+   :http-client (:http/hato state/system)})
+```
+
+Now we can update the test code above to look as follows:
+
+```clojure
+(comment
+  (save-gif (user/api-ctx) {:parameters {:body {:link "https://media.tenor.com/JMzBeLgNaSoAAAAj/banana-dance.gif" :name "foo"}}})
+)
+```
+
+If everything went well then we should see the name of the animation we just stored in the list of the available GIFs:
+
+```clojure
+(->> (list-gifs (user/api-ctx) nil)
+      :body
+      (map #(select-keys % [:name :id])))      
+```
+
+Let's try query it directly as well to test our `get-gif-by-id` function:
+
+```clojure
+(get-gif-by-id (user/api-ctx) {:parameters {:path {:id 3}}})
+```
+
+Now we can see that all the fucntion work as intended, and we can take a look at creating actual tests before we move on to the next steps. We'll navigate to the `io.github.kit.gif2html.core-test` namespace. First thing we'll need to do here will be to require the `io.github.kit.gif2html.web.controllers.gifs` namespace which will be testing.
+
+We'll also use the `system-fixture` from the `io.github.kit.gif2html.test-utils` namespace to get access to the test system:
+
+```clojure
+(use-fixtures :once (utils/system-fixture))
+```
+
+We'll also need to write a version of the `dev-ctx` function we added in the `user` namespace for testing:
+
+```clojure
+(defn test-ctx
+  []
+  (let [{:keys [:db.sql/query-fn :http/hato]} (utils/system-state)]
+    {:query-fn    query-fn
+     :http-client hato}))
+```
+
+With that out of the way, let's try converting the test code from the REPL into tests:
+
+```clojure
+(deftest test-parsing-and-loading-gif
+  (testing "save GIF"
+    (let [{:keys [status body]} (gifs/save-gif (test-ctx) {:parameters {:body {:link "https://media.tenor.com/JMzBeLgNaSoAAAAj/banana-dance.gif" :name "foo"}}})]
+      (is (= 200 status))
+      (is (nat-int? (:id body))))))
+```
+
+The test will save a GIF animation in the db, confirm that the return status is HTTP success, and check that the body contains the `id` that is a number. We can run the test in the REPL the way we'd run a regualr function: `test-parsing-and-loading-gif`. We can also execute all the tests in the namespace as follows:
+
+```clojure
+(run-tests)
+=> {:test 1, :pass 2, :fail 0, :error 0, :type :summary}
+```
+
+Let's update our test to check that we can retrieve the animation:
+
+```clojure
+(deftest test-parsing-and-loading-gif
+  (testing "save GIF"
+    (let [{status :status
+           {:keys [id]} :body} (gifs/save-gif (test-ctx) {:parameters {:body {:link "https://media.tenor.com/JMzBeLgNaSoAAAAj/banana-dance.gif" :name "foo"}}})]
+      (is (= 200 status))
+      (is (nat-int? id))
+      (testing "load GIF"
+        (let [{:keys [status body]} (gifs/get-gif-by-id (test-ctx) {:parameters {:path {:id id}}})]
+          (is (= 200 status))
+          (is (= id (:id body))))))))
+```
+
+Finally, let's add the test for listing the animations:
+
+```clojure
+(deftest test-parsing-and-loading-gif
+  (testing "save GIF"
+    (let [{status :status
+           {:keys [id]} :body} (gifs/save-gif (test-ctx) {:parameters {:body {:link "https://media.tenor.com/JMzBeLgNaSoAAAAj/banana-dance.gif" :name "foo"}}})]
+      (is (= 200 status))
+      (is (nat-int? id))
+      (testing "load GIF"
+        (let [{:keys [status body]} (gifs/get-gif-by-id (test-ctx) {:parameters {:path {:id id}}})]
+          (is (= 200 status))
+          (is (= id (:id body)))))
+      (testing "list GIFs"
+        (is (-> (gifs/list-gifs (test-ctx) {}) :body vector?))))))
+```
