@@ -1,10 +1,12 @@
 (ns io.github.kit.gif2html.core-test
-  (:require 
-   [io.github.kit.gif2html.test-utils :as utils]
-   [clojure.test :refer :all]
-   [io.github.kit.gif2html.web.controllers.gifs :as gifs]))
+  (:require
+    [io.github.kit.gif2html.test-utils :as utils]
+    [clojure.test :refer :all]
+    [io.github.kit.gif2html.web.controllers.gifs :as gifs]))
 
-(use-fixtures :once (utils/system-fixture))
+(use-fixtures :once
+              (utils/system-fixture)
+              utils/clear-db-and-rerun-migrations-fixture)
 
 (defn test-ctx
   []
@@ -14,7 +16,7 @@
 
 (deftest test-parsing-and-loading-gif
   (testing "save GIF"
-    (let [{status :status
+    (let [{status       :status
            {:keys [id]} :body} (gifs/save-gif (test-ctx) {:parameters {:body {:link "https://media.tenor.com/JMzBeLgNaSoAAAAj/banana-dance.gif" :name "foo"}}})]
       (is (= 200 status))
       (is (nat-int? id))
@@ -25,7 +27,8 @@
       (testing "list GIFs"
         (is (-> (gifs/list-gifs (test-ctx) {}) :body vector?))))))
 
-(test-parsing-and-loading-gif)
+(comment
+  (test-parsing-and-loading-gif)
 
-(run-tests)
+  (run-tests))
 

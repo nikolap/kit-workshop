@@ -1019,7 +1019,11 @@ Let's try query it directly as well to test our `get-gif-by-id` function:
 (get-gif-by-id (user/api-ctx) {:parameters {:path {:id 3}}})
 ```
 
-Now we can see that all the fucntion work as intended, and we can take a look at creating actual tests before we move on to the next steps. We'll navigate to the `io.github.kit.gif2html.core-test` namespace. First thing we'll need to do here will be to require the `io.github.kit.gif2html.web.controllers.gifs` namespace which will be testing.
+Now we can see that all the fucntion work as intended, and we can take a look at creating actual tests before we move on to the next steps. 
+
+### Converting REPL commands into tests
+
+We'll navigate to the `io.github.kit.gif2html.core-test` namespace. First thing we'll need to do here will be to require the `io.github.kit.gif2html.web.controllers.gifs` namespace which will be testing.
 
 We'll also use the `system-fixture` from the `io.github.kit.gif2html.test-utils` namespace to get access to the test system:
 
@@ -1084,4 +1088,77 @@ Finally, let's add the test for listing the animations:
           (is (= id (:id body)))))
       (testing "list GIFs"
         (is (-> (gifs/list-gifs (test-ctx) {}) :body vector?))))))
+```
+
+### Setting up a test DB
+
+Up to now our tests have been running on our development DB. This can be solved by either setting up rollbacks in the context of transactions, or provisioning a separate test database. For our purposes we will set up a test database.
+
+Let's extend our `docker-compose.yml` to include a test database. Note the changed DB port and additional volume:
+
+```yaml
+version: '3.9'
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_PASSWORD: gif2html
+      POSTGRES_USER: gif2html
+      POSTGRES_DB: gif2html
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+  testdb:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_PASSWORD: gif2html
+      POSTGRES_USER: gif2html
+      POSTGRES_DB: gif2html
+    ports:
+      - "5442:5432"
+    volumes:
+      - test_db_data:/var/lib/postgresql/data
+
+volumes:
+  db_data:
+  test_db_data:
+```
+
+And also update our `system.edn` to use this new database for test, and keep the original for development.
+
+```clojure
+:db.sql/connection #profile {:dev  {:jdbc-url "jdbc:postgresql://localhost:5432/gif2html?user=gif2html&password=gif2html"}
+                              :test {:jdbc-url "jdbc:postgresql://localhost:5442/gif2html?user=gif2html&password=gif2html"}
+                              :prod {:jdbc-url #env JDBC_URL}}
+```
+
+We can test this works by running `docker compose up -d` again in our shell. When we re-run our tests we should see some data populated in the test database.
+
+Of course we want to clear all this test data from our database so we have a clean slate. Since we don't have a seed dataset to reset to, we should just drop all the tables in our target schema (public) and re-run the migrations. This will look something like this in our `test-utils` namespace:
+
+```clojure
+(defn clear-db-and-rerun-migrations-fixture
+  [f]
+  (jdbc/execute! (:db.sql/connection (system-state))
+                 ["do
+$$
+    declare
+        row record;
+    begin
+        for row in select * from pg_tables where schemaname = 'public'
+            loop
+                execute 'drop table public.' || quote_ident(row.tablename) || ' cascade';
+            end loop;
+    end;
+$$;"])
+  (migratus/migrate (:db.sql/migrations (system-state)))
+  (f))
+```
+
+Now that we have this running in our REPL, let's stop our server and try running our tests from the command line:
+
+```shell
+clojure -M:test
 ```
